@@ -50,8 +50,37 @@ export function makeVariant(crop: CropVariant, id: string): CropVariant {
   return { ...normalizeCrop(crop), id };
 }
 
+// 仅比对裁切几何信息，不包含 id（当前裁切框的 id 恒为 'current'）
+export function isSameCrop(a: CropVariant, b: CropVariant): boolean {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height && a.ratio === b.ratio;
+}
+
+// 'exact' 当前裁切与某个已保存方案完全一致；'derived' 基于某个方案改动过；null 与任何方案都无关
+export type CropMatchKind = 'exact' | 'derived';
+
+export interface CropMatch {
+  kind: CropMatchKind;
+  variantId: string;
+}
+
+export function matchCrop(crop: CropVariant, variants: CropVariant[], originVariantId: string | null): CropMatch | null {
+  const exact = variants.find((variant) => isSameCrop(crop, variant));
+  if (exact) return { kind: 'exact', variantId: exact.id };
+  if (originVariantId && variants.some((variant) => variant.id === originVariantId)) {
+    return { kind: 'derived', variantId: originVariantId };
+  }
+  return null;
+}
+
 export function isFrameDocument(value: unknown): value is FrameDocument {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<FrameDocument>;
   return candidate.version === 1 && typeof candidate.guides === 'object' && candidate.crop !== undefined && Array.isArray(candidate.variants);
+}
+
+// 旧版本存档没有 originVariantId：几何完全相同的方案视为来源，使重开页面后的高亮与切换时一致
+export function hydrateDocument(value: FrameDocument): FrameDocument {
+  const origin = value.originVariantId ?? value.variants.find((variant) => isSameCrop(value.crop, variant))?.id ?? null;
+  const originVariantId = origin !== null && value.variants.some((variant) => variant.id === origin) ? origin : null;
+  return { ...value, originVariantId };
 }

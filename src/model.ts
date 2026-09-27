@@ -25,6 +25,8 @@ export interface FrameDocument {
   subject: { x: number; y: number } | null;
   crop: CropVariant;
   variants: CropVariant[];
+  // 当前裁切框来源的已保存方案 id：完全相同时高亮“当前”，改动后仍可标识“由此方案改动”
+  originVariantId: string | null;
 }
 
 export interface ViewState {
@@ -51,4 +53,5 @@ export const EMPTY_DOCUMENT: FrameDocument = {
   subject: null,
   crop: DEFAULT_CROP,
   variants: [],
+  originVariantId: null,
 };

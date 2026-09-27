@@ -85,14 +85,16 @@ export class FrameSenseViewModel {
   saveVariant(): void {
     const id = `variant-${Date.now()}`;
     const variant = makeVariant(this.state.document.crop, id);
-    const document = { ...this.state.document, variants: [...this.state.document.variants, variant].slice(-8) };
-    this.persist(document, `已保存裁切方案 ${document.variants.length}。`);
+    const variants = [...this.state.document.variants, variant].slice(-8);
+    // 新保存的方案即当前裁切本身；超出 8 个被挤掉时也要清掉失效来源
+    const document = { ...this.state.document, variants, originVariantId: id };
+    this.persist(document, `已保存裁切方案 ${variants.length}。`);
   }
 
   selectVariant(id: string): void {
     const variant = this.state.document.variants.find((item) => item.id === id);
     if (!variant) return;
-    this.persist({ ...this.state.document, crop: { ...variant, id: 'current' } }, '已切换到保存的裁切方案。');
+    this.persist({ ...this.state.document, crop: { ...variant, id: 'current' }, originVariantId: id }, '已切换到保存的裁切方案。');
   }
 
   toggleCompare(): void {

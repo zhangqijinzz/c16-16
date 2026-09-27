@@ -26,4 +26,15 @@ describe('LocalFrameRepository', () => {
     expect(document.image).toBeNull();
     expect(document.variants).toEqual([]);
   });
+
+  it('rebuilds the origin highlight for legacy documents without originVariantId', () => {
+    const storage = new MemoryStorage();
+    const variant = { id: 'variant-1', x: 0.2, y: 0.1, width: 0.5, height: 0.6, ratio: 'free' };
+    storage.value = JSON.stringify({
+      ...structuredClone(EMPTY_DOCUMENT),
+      crop: { ...variant, id: 'current' },
+      variants: [variant],
+    });
+    expect(new LocalFrameRepository(storage).load().originVariantId).toBe('variant-1');
+  });
 });

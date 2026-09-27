@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FrameSenseViewModel } from '../viewModel';
-import { EMPTY_DOCUMENT, type FrameDocument, type ImageAsset } from '../model';
+import { matchCrop } from '../domain';
+import { DEFAULT_CROP, EMPTY_DOCUMENT, type CropVariant, type FrameDocument, type ImageAsset } from '../model';
 import type { FrameRepository } from '../repository';
 import type { ImageService } from '../service';
 
@@ -48,5 +49,43 @@ describe('FrameSenseViewModel', () => {
     expect(vm.getSnapshot().phase).toBe('error');
     expect(vm.getSnapshot().document.image).not.toBeNull();
     expect(vm.getSnapshot().error).toContain('本地保存失败');
+  });
+
+  it('highlights the exact variant after switching and keeps the origin after edits', () => {
+    vm.loadDemo();
+    const base: CropVariant = { id: 'variant-a', x: 0.1, y: 0.1, width: 0.5, height: 0.5, ratio: 'free' };
+    const other: CropVariant = { id: 'variant-b', x: 0.1, y: 0.1, width: 0.8, height: 0.3, ratio: 'free' };
+    repository.document = {
+      ...repository.document,
+      crop: { ...DEFAULT_CROP },
+      variants: [base, other],
+      originVariantId: null,
+    };
+    void vm.initialize();
+
+    vm.selectVariant('variant-a');
+    let doc = vm.getSnapshot().document;
+    expect(doc.originVariantId).toBe('variant-a');
+    expect(matchCrop(doc.crop, doc.variants, doc.originVariantId)).toEqual({ kind: 'exact', variantId: 'variant-a' });
+
+    vm.moveCrop(0.05, 0.05);
+    doc = vm.getSnapshot().document;
+    expect(doc.crop.x).toBeCloseTo(0.15);
+    expect(matchCrop(doc.crop, doc.variants, doc.originVariantId)).toEqual({ kind: 'derived', variantId: 'variant-a' });
+  });
+
+  it('treats a freshly saved variant as exact and restores the same highlight after reload', async () => {
+    vm.loadDemo();
+    vm.resizeCrop(0.6, 0.4);
+    vm.saveVariant();
+    const savedId = vm.getSnapshot().document.variants[0].id;
+    expect(vm.getSnapshot().document.originVariantId).toBe(savedId);
+    expect(matchCrop(vm.getSnapshot().document.crop, vm.getSnapshot().document.variants, savedId)).toEqual({ kind: 'exact', variantId: savedId });
+
+    vm.moveCrop(0.04, 0);
+    const reloaded = new FrameSenseViewModel(repository, new FakeImageService());
+    await reloaded.initialize();
+    const doc = reloaded.getSnapshot().document;
+    expect(matchCrop(doc.crop, doc.variants, doc.originVariantId)).toEqual({ kind: 'derived', variantId: savedId });
   });
 });
