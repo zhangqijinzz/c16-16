@@ -1,4 +1,4 @@
-import type { CropVariant, FrameDocument, Ratio } from './model';
+import type { CropVariant, FrameDocument, Ratio, VariantRelation } from './model';
 
 const clamp = (value: number, min = 0, max = 1): number => Math.min(max, Math.max(min, value));
 
@@ -50,8 +50,34 @@ export function makeVariant(crop: CropVariant, id: string): CropVariant {
   return { ...normalizeCrop(crop), id };
 }
 
+export function isSameCrop(a: CropVariant, b: CropVariant): boolean {
+  return a.x === b.x
+    && a.y === b.y
+    && a.width === b.width
+    && a.height === b.height
+    && a.ratio === b.ratio;
+}
+
+export function getVariantRelation(document: Pick<FrameDocument, 'crop' | 'variants' | 'activeVariantId'>): VariantRelation | null {
+  const activeVariant = document.variants.find((variant) => variant.id === document.activeVariantId);
+  if (activeVariant && isSameCrop(document.crop, activeVariant)) {
+    return { variantId: activeVariant.id, status: 'exact' };
+  }
+
+  const exactVariant = document.variants.find((variant) => isSameCrop(document.crop, variant));
+  if (exactVariant) return { variantId: exactVariant.id, status: 'exact' };
+
+  return activeVariant ? { variantId: activeVariant.id, status: 'modified' } : null;
+}
+
 export function isFrameDocument(value: unknown): value is FrameDocument {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<FrameDocument>;
-  return candidate.version === 1 && typeof candidate.guides === 'object' && candidate.crop !== undefined && Array.isArray(candidate.variants);
+  return candidate.version === 1
+    && typeof candidate.guides === 'object'
+    && candidate.crop !== undefined
+    && Array.isArray(candidate.variants)
+    && (candidate.activeVariantId === undefined
+      || candidate.activeVariantId === null
+      || typeof candidate.activeVariantId === 'string');
 }

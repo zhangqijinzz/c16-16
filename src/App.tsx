@@ -5,7 +5,8 @@ import { Toolbar } from './components/Toolbar';
 import { VariantList } from './components/VariantList';
 import { LocalFrameRepository } from './repository';
 import { BrowserImageService, BrowserStorageService } from './service';
-import type { CropVariant, ImageAsset, Ratio } from './model';
+import { getVariantRelation } from './domain';
+import type { CropVariant, ImageAsset, Ratio, VariantRelation } from './model';
 import { useFrameSenseViewModel } from './viewModel';
 
 const repository = new LocalFrameRepository(new BrowserStorageService());
@@ -16,6 +17,7 @@ export default function App() {
   const [showInfo, setShowInfo] = useState(false);
   useEffect(() => { void viewModel.initialize(); }, [viewModel]);
   const { document } = state;
+  const variantRelation = getVariantRelation(document);
   const handleImport = (file: File) => { void viewModel.importImage(file); };
 
   return (
@@ -29,16 +31,19 @@ export default function App() {
         <Toolbar guides={document.guides} ratio={document.crop.ratio} onImport={handleImport} onDemo={() => viewModel.loadDemo()} onToggleGuide={(guide) => viewModel.toggleGuide(guide)} onRatio={(ratio: Ratio) => viewModel.setRatio(ratio)} onCompare={() => viewModel.toggleCompare()} compareOpen={state.compareOpen} />
         <section className="work-area">
           <div className="work-heading"><div><p className="eyebrow">WORKSPACE / {document.image ? 'EDITING' : 'READY'}</p><h1>{document.image ? document.image.name : '构图工作台'}</h1></div><div className="notice" role="status">{state.error ?? state.notice}</div></div>
-          {!document.image ? <EmptyState onDemo={() => viewModel.loadDemo()} /> : state.compareOpen ? <Comparison image={document.image} variants={document.variants} /> : <CanvasStage image={document.image} guides={document.guides} crop={document.crop} subject={document.subject} onSubject={(x, y) => viewModel.markSubject(x, y)} onMoveCrop={(dx, dy) => viewModel.moveCrop(dx, dy)} onResizeCrop={(width, height) => viewModel.resizeCrop(width, height)} />}
+          {!document.image ? <EmptyState onDemo={() => viewModel.loadDemo()} /> : state.compareOpen ? <Comparison image={document.image} variants={document.variants} relation={variantRelation} /> : <CanvasStage image={document.image} guides={document.guides} crop={document.crop} subject={document.subject} onSubject={(x, y) => viewModel.markSubject(x, y)} onMoveCrop={(dx, dy) => viewModel.moveCrop(dx, dy)} onResizeCrop={(width, height) => viewModel.resizeCrop(width, height)} />}
           {document.image && !state.compareOpen && <div className="editor-footer"><span><b>当前比例</b> {document.crop.ratio === 'free' ? '自由裁切' : document.crop.ratio}</span><span><b>辅助层</b> {Object.values(document.guides).filter(Boolean).length} 个开启</span><span><b>主体</b> {document.subject ? '已标记' : '点击画面添加'}</span></div>}
         </section>
-        {document.image && <VariantList variants={document.variants} image={document.image} current={document.crop} onSave={() => viewModel.saveVariant()} onSelect={(id) => viewModel.selectVariant(id)} />}
+        {document.image && <VariantList variants={document.variants} image={document.image} relation={variantRelation} onSave={() => viewModel.saveVariant()} onSelect={(id) => viewModel.selectVariant(id)} />}
       </main>
       <footer className="footer"><span>FrameSense · 原图不会被修改</span><span>本地自动保存 · {document.variants.length}/8 方案</span></footer>
     </div>
   );
 }
 
-function Comparison({ image, variants }: { image: ImageAsset; variants: CropVariant[] }) {
-  return <div className="comparison"><div className="compare-intro"><p className="eyebrow">SIDE BY SIDE / {variants.length} FRAMES</p><h2>把取舍放在一起看</h2><p>保存的每个版本都保留原图，只改变裁切窗口。</p></div>{variants.length === 0 ? <div className="compare-empty">先在工作台保存至少一个裁切方案。</div> : <div className="comparison-grid">{variants.map((variant, index) => <article key={variant.id}><div className="compare-image"><img src={image.src} alt={`方案 ${index + 1}`} style={{ objectPosition: `${variant.x * 100}% ${variant.y * 100}%` }} /><span>方案 {String(index + 1).padStart(2, '0')}</span></div><div><strong>{variant.ratio === 'free' ? '自由裁切' : variant.ratio}</strong><small>{Math.round(variant.width * 100)}% × {Math.round(variant.height * 100)}%</small></div></article>)}</div>}</div>;
+function Comparison({ image, variants, relation }: { image: ImageAsset; variants: CropVariant[]; relation: VariantRelation | null }) {
+  return <div className="comparison"><div className="compare-intro"><p className="eyebrow">SIDE BY SIDE / {variants.length} FRAMES</p><h2>把取舍放在一起看</h2><p>保存的每个版本都保留原图，只改变裁切窗口。</p></div>{variants.length === 0 ? <div className="compare-empty">先在工作台保存至少一个裁切方案。</div> : <div className="comparison-grid">{variants.map((variant, index) => {
+    const status = relation?.variantId === variant.id ? relation.status : null;
+    return <article className={status ?? ''} key={variant.id}><div className="compare-image"><img src={image.src} alt={`方案 ${index + 1}`} style={{ objectPosition: `${variant.x * 100}% ${variant.y * 100}%` }} /><span>方案 {String(index + 1).padStart(2, '0')}</span>{status && <em className={`compare-relation ${status}`}>{status === 'exact' ? '当前方案' : '当前修改来源'}</em>}</div><div><strong>{variant.ratio === 'free' ? '自由裁切' : variant.ratio}</strong><small>{Math.round(variant.width * 100)}% × {Math.round(variant.height * 100)}%</small></div></article>;
+  })}</div>}</div>;
 }

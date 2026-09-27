@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { cropForRatio, makeVariant, moveCrop, resizeCrop } from './domain';
+import { cropForRatio, isSameCrop, makeVariant, moveCrop, resizeCrop } from './domain';
 import { EMPTY_DOCUMENT, type FrameDocument, type GuideKey, type Ratio, type ViewState } from './model';
 import type { FrameRepository } from './repository';
 import type { ImageService } from './service';
@@ -31,6 +31,15 @@ export class FrameSenseViewModel {
     } catch {
       this.patch({ phase: 'error', error: '本地保存失败，但当前编辑仍保留在页面中。请检查浏览器存储权限。' });
     }
+  }
+
+  private applyCrop(crop: FrameDocument['crop'], notice: string): void {
+    const activeVariant = this.state.document.variants.find((variant) => variant.id === this.state.document.activeVariantId);
+    const exactVariant = activeVariant && isSameCrop(crop, activeVariant)
+      ? activeVariant
+      : this.state.document.variants.find((variant) => isSameCrop(crop, variant));
+    const activeVariantId = exactVariant?.id ?? this.state.document.activeVariantId;
+    this.persist({ ...this.state.document, crop, activeVariantId }, notice);
   }
 
   async initialize(): Promise<void> {
@@ -66,16 +75,15 @@ export class FrameSenseViewModel {
   setRatio(ratio: Ratio): void {
     const image = this.state.document.image;
     if (!image) return;
-    const crop = cropForRatio(ratio, image.width / image.height, this.state.document.crop);
-    this.persist({ ...this.state.document, crop }, `${ratio === 'free' ? '自由' : ratio} 裁切已应用。`);
+    this.applyCrop(cropForRatio(ratio, image.width / image.height, this.state.document.crop), `${ratio === 'free' ? '自由' : ratio} 裁切已应用。`);
   }
 
   moveCrop(dx: number, dy: number): void {
-    this.persist({ ...this.state.document, crop: moveCrop(this.state.document.crop, dx, dy) }, '裁切位置已调整。');
+    this.applyCrop(moveCrop(this.state.document.crop, dx, dy), '裁切位置已调整。');
   }
 
   resizeCrop(width: number, height: number): void {
-    this.persist({ ...this.state.document, crop: resizeCrop(this.state.document.crop, width, height) }, '裁切范围已调整。');
+    this.applyCrop(resizeCrop(this.state.document.crop, width, height), '裁切范围已调整。');
   }
 
   markSubject(x: number, y: number): void {
@@ -85,14 +93,14 @@ export class FrameSenseViewModel {
   saveVariant(): void {
     const id = `variant-${Date.now()}`;
     const variant = makeVariant(this.state.document.crop, id);
-    const document = { ...this.state.document, variants: [...this.state.document.variants, variant].slice(-8) };
+    const document = { ...this.state.document, variants: [...this.state.document.variants, variant].slice(-8), activeVariantId: id };
     this.persist(document, `已保存裁切方案 ${document.variants.length}。`);
   }
 
   selectVariant(id: string): void {
     const variant = this.state.document.variants.find((item) => item.id === id);
     if (!variant) return;
-    this.persist({ ...this.state.document, crop: { ...variant, id: 'current' } }, '已切换到保存的裁切方案。');
+    this.persist({ ...this.state.document, crop: { ...variant, id: 'current' }, activeVariantId: id }, '已切换到保存的裁切方案。');
   }
 
   toggleCompare(): void {

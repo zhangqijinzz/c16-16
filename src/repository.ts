@@ -15,7 +15,9 @@ export class LocalFrameRepository implements FrameRepository {
     if (!raw) return structuredClone(EMPTY_DOCUMENT);
     try {
       const parsed: unknown = JSON.parse(raw);
-      return isFrameDocument(parsed) ? parsed : structuredClone(EMPTY_DOCUMENT);
+      if (!isFrameDocument(parsed)) return structuredClone(EMPTY_DOCUMENT);
+      const activeVariantId = parsed.variants.some((variant) => variant.id === parsed.activeVariantId) ? parsed.activeVariantId : null;
+      return { ...parsed, activeVariantId };
     } catch {
       return structuredClone(EMPTY_DOCUMENT);
     }

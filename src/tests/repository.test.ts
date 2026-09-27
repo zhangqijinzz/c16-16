@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LocalFrameRepository } from '../repository';
-import { EMPTY_DOCUMENT } from '../model';
+import { EMPTY_DOCUMENT, type FrameDocument } from '../model';
 import type { StorageService } from '../service';
 
 class MemoryStorage implements StorageService {
@@ -16,6 +16,15 @@ describe('LocalFrameRepository', () => {
     const document = { ...structuredClone(EMPTY_DOCUMENT), subject: { x: 0.4, y: 0.6 } };
     repository.save(document);
     expect(repository.load().subject).toEqual({ x: 0.4, y: 0.6 });
+  });
+
+  it('loads documents saved before variant relations existed', () => {
+    const storage = new MemoryStorage();
+    const legacyDocument: Partial<FrameDocument> = structuredClone(EMPTY_DOCUMENT);
+    delete legacyDocument.activeVariantId;
+    storage.value = JSON.stringify(legacyDocument);
+
+    expect(new LocalFrameRepository(storage).load().activeVariantId).toBeNull();
   });
 
   it('falls back to a usable empty document for damaged data', () => {

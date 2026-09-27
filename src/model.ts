@@ -25,6 +25,14 @@ export interface FrameDocument {
   subject: { x: number; y: number } | null;
   crop: CropVariant;
   variants: CropVariant[];
+  activeVariantId: string | null;
+}
+
+export type VariantRelationStatus = 'exact' | 'modified';
+
+export interface VariantRelation {
+  variantId: string;
+  status: VariantRelationStatus;
 }
 
 export interface ViewState {
@@ -51,4 +59,5 @@ export const EMPTY_DOCUMENT: FrameDocument = {
   subject: null,
   crop: DEFAULT_CROP,
   variants: [],
+  activeVariantId: null,
 };

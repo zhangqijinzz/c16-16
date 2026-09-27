@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { getVariantRelation } from '../domain';
 import { FrameSenseViewModel } from '../viewModel';
 import { EMPTY_DOCUMENT, type FrameDocument, type ImageAsset } from '../model';
 import type { FrameRepository } from '../repository';
@@ -40,6 +41,39 @@ describe('FrameSenseViewModel', () => {
     expect(vm.getSnapshot().document.subject).toEqual({ x: 0.2, y: 0.8 });
     expect(vm.getSnapshot().document.crop.ratio).toBe('1:1');
     expect(vm.getSnapshot().document.variants).toHaveLength(1);
+  });
+
+  it('keeps a modified variant linked to its source after editing', () => {
+    vm.loadDemo();
+    vm.setRatio('1:1');
+    vm.saveVariant();
+    const variantId = vm.getSnapshot().document.variants[0].id;
+    vm.moveCrop(0.05, 0.02);
+
+    const document = vm.getSnapshot().document;
+    expect(document.activeVariantId).toBe(variantId);
+    expect(getVariantRelation(document)).toEqual({ variantId, status: 'modified' });
+  });
+
+  it('restores the same variant relation after reopening', async () => {
+    vm.loadDemo();
+    vm.setRatio('1:1');
+    vm.saveVariant();
+    const variantId = vm.getSnapshot().document.variants[0].id;
+    vm.moveCrop(0.05, 0.02);
+
+    const reopened = new FrameSenseViewModel(repository, new FakeImageService());
+    await reopened.initialize();
+    expect(reopened.getSnapshot().document.activeVariantId).toBe(variantId);
+    expect(getVariantRelation(reopened.getSnapshot().document)).toEqual({ variantId, status: 'modified' });
+  });
+
+  it('marks a saved variant as the exact current version', () => {
+    vm.loadDemo();
+    vm.setRatio('1:1');
+    vm.saveVariant();
+    const variantId = vm.getSnapshot().document.variants[0].id;
+    expect(getVariantRelation(vm.getSnapshot().document)).toEqual({ variantId, status: 'exact' });
   });
 
   it('keeps edits in memory and reports persistence failure', () => {
